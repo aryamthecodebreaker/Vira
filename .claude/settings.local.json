@@ -21,7 +21,9 @@
       "Bash(git stash:*)",
       "Bash(git checkout:*)",
       "Bash(curl:*)",
-      "Bash(start \"https://github.com/aryamthecodebreaker/Vira/compare/main...master?quick_pull=1&title=Migrate+to+OpenAI+GPT-4o+%2B+deployment+config&body=%23%23+Summary%0A-+Replaced+Anthropic+Claude+SDK+with+OpenAI+SDK+%28GPT-4o%29%0A-+Updated+streaming+chat+API+to+use+OpenAI+chat+completions+format%0A-+Added+.vercel+to+.gitignore%0A-+Updated+project+config+for+Vercel+deployment%0A%0A%23%23+Test+plan%0A-+%5B+%5D+Verify+chat+streaming+works+with+OpenAI+API+key+set%0A-+%5B+%5D+Confirm+all+4+routes+functional+%28%2F%2C+%2Fadmin%2C+%2Fpartner%2C+%2Fowner%29%0A-+%5B+%5D+Test+Vercel+deployment+builds+successfully\")"
+      "Bash(start \"https://github.com/aryamthecodebreaker/Vira/compare/main...master?quick_pull=1&title=Migrate+to+OpenAI+GPT-4o+%2B+deployment+config&body=%23%23+Summary%0A-+Replaced+Anthropic+Claude+SDK+with+OpenAI+SDK+%28GPT-4o%29%0A-+Updated+streaming+chat+API+to+use+OpenAI+chat+completions+format%0A-+Added+.vercel+to+.gitignore%0A-+Updated+project+config+for+Vercel+deployment%0A%0A%23%23+Test+plan%0A-+%5B+%5D+Verify+chat+streaming+works+with+OpenAI+API+key+set%0A-+%5B+%5D+Confirm+all+4+routes+functional+%28%2F%2C+%2Fadmin%2C+%2Fpartner%2C+%2Fowner%29%0A-+%5B+%5D+Test+Vercel+deployment+builds+successfully\")",
+      "Bash(git branch:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
