@@ -1,7 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 })
 
 export const VIRA_SYSTEM_PROMPT = `You are Vira, a warm, proactive, and knowledgeable AI real estate assistant. You help users find their dream properties in India.
@@ -47,17 +47,20 @@ ${JSON.stringify(userPreferences, null, 2)}
 Use this context to personalize your responses.`
   }
 
-  const stream = await anthropic.messages.stream({
-    model: 'claude-sonnet-4-20250514',
+  const stream = await openai.chat.completions.create({
+    model: 'gpt-4o',
     max_tokens: 1024,
-    system: systemPrompt,
-    messages: messages.map(m => ({
-      role: m.role,
-      content: m.content,
-    })),
+    stream: true,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...messages.map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })),
+    ],
   })
 
   return stream
 }
 
-export { anthropic }
+export { openai }
