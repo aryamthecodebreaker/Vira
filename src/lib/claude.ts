@@ -1,8 +1,6 @@
-import OpenAI from 'openai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 export const VIRA_SYSTEM_PROMPT = `You are Vira, a warm, proactive, and knowledgeable AI real estate assistant. You help users find their dream properties in India.
 
@@ -47,20 +45,26 @@ ${JSON.stringify(userPreferences, null, 2)}
 Use this context to personalize your responses.`
   }
 
-  const stream = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    max_tokens: 1024,
-    stream: true,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      ...messages.map(m => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      })),
-    ],
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    systemInstruction: systemPrompt,
   })
 
-  return stream
+  // Convert messages to Gemini format
+  const geminiHistory = messages.slice(0, -1).map(m => ({
+    role: m.role === 'assistant' ? 'model' as const : 'user' as const,
+    parts: [{ text: m.content }],
+  }))
+
+  const lastMessage = messages[messages.length - 1]
+
+  const chat = model.startChat({
+    history: geminiHistory,
+  })
+
+  const result = await chat.sendMessageStream(lastMessage.content)
+
+  return result.stream
 }
 
-export { openai }
+export { genAI }
