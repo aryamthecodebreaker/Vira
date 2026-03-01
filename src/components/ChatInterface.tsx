@@ -78,7 +78,10 @@ export function ChatInterface() {
         body: JSON.stringify({ messages: chatMessages }),
       })
 
-      if (!response.ok) throw new Error('Failed to get response')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        throw new Error(errorData?.error || 'Failed to get response')
+      }
 
       const reader = response.body?.getReader()
       if (!reader) throw new Error('No reader')
@@ -130,13 +133,13 @@ export function ChatInterface() {
       }
     } catch (error) {
       console.error('Chat error:', error)
+      const errMsg = error instanceof Error ? error.message : 'Unknown error'
       setMessages(prev => [
         ...prev,
         {
           id: `error_${Date.now()}`,
           role: 'assistant',
-          content:
-            "I'm sorry, I encountered an error. Please try again in a moment.",
+          content: `I'm sorry, I encountered an issue: ${errMsg}`,
           timestamp: new Date().toISOString(),
         },
       ])

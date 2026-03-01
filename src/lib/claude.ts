@@ -49,59 +49,72 @@ ${JSON.stringify(userPreferences, null, 2)}
 Use this context to personalize your responses.`
   }
 
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
-    systemInstruction: systemPrompt,
-  })
+  // Try primary model, fall back to lite if rate limited
+  const modelNames = ['gemini-2.0-flash', 'gemini-1.5-flash']
+  let lastError: Error | null = null
 
-  // Convert messages to Gemini format
-  // Gemini requires history to start with a 'user' role message
-  // and alternate user/model. We need to filter/fix the order.
-  const allMessages = messages.map(m => ({
-    role: m.role === 'assistant' ? 'model' as const : 'user' as const,
-    content: m.content,
-  }))
-
-  // Separate history (all but last) and the current message
-  const historyMessages = allMessages.slice(0, -1)
-  const lastMessage = allMessages[allMessages.length - 1]
-
-  // Gemini requires: history starts with 'user', alternates user/model
-  // Filter out any leading 'model' messages and merge consecutive same-role messages
-  const cleanHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = []
-  for (const msg of historyMessages) {
-    // Skip leading model messages (Gemini doesn't allow history starting with model)
-    if (cleanHistory.length === 0 && msg.role === 'model') {
-      continue
-    }
-    // If same role as previous, merge into previous
-    if (cleanHistory.length > 0 && cleanHistory[cleanHistory.length - 1].role === msg.role) {
-      cleanHistory[cleanHistory.length - 1].parts[0].text += '\n' + msg.content
-    } else {
-      cleanHistory.push({
-        role: msg.role,
-        parts: [{ text: msg.content }],
+  for (const modelName of modelNames) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: systemPrompt,
       })
+
+      // Convert messages to Gemini format
+      const allMessages = messages.map(m => ({
+        role: m.role === 'assistant' ? 'model' as const : 'user' as const,
+        content: m.content,
+      }))
+
+      // Separate history and current message
+      const historyMessages = allMessages.slice(0, -1)
+      const lastMessage = allMessages[allMessages.length - 1]
+
+      // Clean history: must start with 'user', alternate user/model
+      const cleanHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = []
+      for (const msg of historyMessages) {
+        if (cleanHistory.length === 0 && msg.role === 'model') {
+          continue
+        }
+        if (cleanHistory.length > 0 && cleanHistory[cleanHistory.length - 1].role === msg.role) {
+          cleanHistory[cleanHistory.length - 1].parts[0].text += '\n' + msg.content
+        } else {
+          cleanHistory.push({
+            role: msg.role,
+            parts: [{ text: msg.content }],
+          })
+        }
+      }
+
+      // History must end with 'model' if non-empty
+      while (cleanHistory.length > 0 && cleanHistory[cleanHistory.length - 1].role === 'user') {
+        const removed = cleanHistory.pop()!
+        if (lastMessage.role === 'user') {
+          lastMessage.content = removed.parts[0].text + '\n' + lastMessage.content
+        }
+      }
+
+      const chat = model.startChat({
+        history: cleanHistory,
+      })
+
+      const result = await chat.sendMessageStream(lastMessage.content)
+      return result.stream
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      const errMsg = lastError.message || ''
+      // If rate limited, try next model
+      if (errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('Too Many Requests')) {
+        console.warn(`Rate limited on ${modelName}, trying fallback...`)
+        continue
+      }
+      // For other errors, throw immediately
+      throw lastError
     }
   }
 
-  // Gemini also requires history to end with 'model' if it has entries
-  // and the last message we send must be 'user'. Trim trailing user from history.
-  while (cleanHistory.length > 0 && cleanHistory[cleanHistory.length - 1].role === 'user') {
-    const removed = cleanHistory.pop()!
-    // Prepend this to the lastMessage if it's also user
-    if (lastMessage.role === 'user') {
-      lastMessage.content = removed.parts[0].text + '\n' + lastMessage.content
-    }
-  }
-
-  const chat = model.startChat({
-    history: cleanHistory,
-  })
-
-  const result = await chat.sendMessageStream(lastMessage.content)
-
-  return result.stream
+  // If all models failed
+  throw lastError || new Error('All Gemini models are currently unavailable')
 }
 
 export { genAI }

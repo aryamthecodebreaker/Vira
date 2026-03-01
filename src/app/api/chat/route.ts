@@ -53,9 +53,20 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('Chat API error:', error)
-    const message =
+    const rawMessage =
       error instanceof Error ? error.message : 'Internal server error'
-    return new Response(JSON.stringify({ error: message }), {
+
+    // Parse user-friendly error
+    let userMessage = rawMessage
+    if (rawMessage.includes('429') || rawMessage.includes('quota')) {
+      userMessage = 'API rate limit reached. Please wait a minute and try again.'
+    } else if (rawMessage.includes('API_KEY')) {
+      userMessage = 'API key is not configured. Please contact the administrator.'
+    } else if (rawMessage.includes('404') || rawMessage.includes('not found')) {
+      userMessage = 'AI model not available. Please try again later.'
+    }
+
+    return new Response(JSON.stringify({ error: userMessage }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     })
