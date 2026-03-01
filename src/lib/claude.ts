@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
 export const VIRA_SYSTEM_PROMPT = `You are Vira, a warm, proactive, and knowledgeable AI real estate assistant. You help users find their dream properties in India.
 
@@ -37,6 +37,10 @@ export async function streamViraResponse(
   messages: { role: 'user' | 'assistant'; content: string }[],
   userPreferences?: Record<string, unknown> | null
 ) {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY environment variable is not set')
+  }
+
   let systemPrompt = VIRA_SYSTEM_PROMPT
 
   if (userPreferences) {
@@ -51,15 +55,48 @@ Use this context to personalize your responses.`
   })
 
   // Convert messages to Gemini format
-  const geminiHistory = messages.slice(0, -1).map(m => ({
+  // Gemini requires history to start with a 'user' role message
+  // and alternate user/model. We need to filter/fix the order.
+  const allMessages = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' as const : 'user' as const,
-    parts: [{ text: m.content }],
+    content: m.content,
   }))
 
-  const lastMessage = messages[messages.length - 1]
+  // Separate history (all but last) and the current message
+  const historyMessages = allMessages.slice(0, -1)
+  const lastMessage = allMessages[allMessages.length - 1]
+
+  // Gemini requires: history starts with 'user', alternates user/model
+  // Filter out any leading 'model' messages and merge consecutive same-role messages
+  const cleanHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = []
+  for (const msg of historyMessages) {
+    // Skip leading model messages (Gemini doesn't allow history starting with model)
+    if (cleanHistory.length === 0 && msg.role === 'model') {
+      continue
+    }
+    // If same role as previous, merge into previous
+    if (cleanHistory.length > 0 && cleanHistory[cleanHistory.length - 1].role === msg.role) {
+      cleanHistory[cleanHistory.length - 1].parts[0].text += '\n' + msg.content
+    } else {
+      cleanHistory.push({
+        role: msg.role,
+        parts: [{ text: msg.content }],
+      })
+    }
+  }
+
+  // Gemini also requires history to end with 'model' if it has entries
+  // and the last message we send must be 'user'. Trim trailing user from history.
+  while (cleanHistory.length > 0 && cleanHistory[cleanHistory.length - 1].role === 'user') {
+    const removed = cleanHistory.pop()!
+    // Prepend this to the lastMessage if it's also user
+    if (lastMessage.role === 'user') {
+      lastMessage.content = removed.parts[0].text + '\n' + lastMessage.content
+    }
+  }
 
   const chat = model.startChat({
-    history: geminiHistory,
+    history: cleanHistory,
   })
 
   const result = await chat.sendMessageStream(lastMessage.content)

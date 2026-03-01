@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
           controller.close()
         } catch (error) {
+          console.error('Gemini stream error:', error)
           const errMsg =
             error instanceof Error ? error.message : 'Stream error'
           controller.enqueue(
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
       },
     })
   } catch (error) {
+    console.error('Chat API error:', error)
     const message =
       error instanceof Error ? error.message : 'Internal server error'
     return new Response(JSON.stringify({ error: message }), {
